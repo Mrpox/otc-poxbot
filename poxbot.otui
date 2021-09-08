@@ -559,7 +559,7 @@ MainWindow
     Label
       id: wptlabel
       !text: tr('Filename:') 
-      anchors.top: prev.bottom
+      anchors.top: parent.top
       anchors.left: parent.left
 
     TextEdit
@@ -576,7 +576,7 @@ MainWindow
       !text: tr('Save')
       width: 80
       @onClick: modules.game_poxbot.saveWaypoints()
-      !tooltip: tr('Saves your waypoints in the filename above, located inside modules/otcbot-master/wpts.')
+      !tooltip: tr('Saves your waypoints in the filename above, located inside modules/otcbot-master/savedfiles.')
       anchors.top: prev.bottom
       anchors.left: prev.left
       margin-top: 2
@@ -586,7 +586,7 @@ MainWindow
       !text: tr('Load')
       width: 80
       @onClick: modules.game_poxbot.loadWaypoints()
-      !tooltip: tr('Loads your waypoints from the filename above, located inside modules/otcbot-master/wpts.')
+      !tooltip: tr('Loads your waypoints from the filename above, located inside modules/game_poxbot/savedfiles.')
       anchors.top: save.top
       anchors.left: save.right
 
@@ -595,7 +595,7 @@ MainWindow
       !text: tr('Mana training')
       !tooltip: tr('Automatically cast this spell when above mana:')
       anchors.top: prev.bottom
-      anchors.left: clear.left
+      anchors.left: parent.left
       width: 180
       focusable: true
 
@@ -604,7 +604,7 @@ MainWindow
       width: 100
       !text: tr('utana vid')
       anchors.top: prev.bottom
-      anchors.left: clear.left
+      anchors.left: parent.left
       margin-top: 2
 
 
@@ -637,7 +637,7 @@ MainWindow
       id: AutoHaste
       !text: tr('Auto haste')
       anchors.top: prev.bottom
-      anchors.left: clear.left
+      anchors.left: parent.left
       width: 180
       focusable: true
 
@@ -646,7 +646,7 @@ MainWindow
       width: 100
       !text: tr('utani hur')
       anchors.top: prev.bottom
-      anchors.left: clear.left
+      anchors.left: parent.left
       margin-top: 2
 
     NormalBotBox
@@ -654,6 +654,6 @@ MainWindow
       !text: tr('Auto mana shield')
       !tooltip: tr('Automatically cast utamo vita when you dont have magic shield')
       anchors.top: prev.bottom
-      anchors.left: clear.left
+      anchors.left: parent.left
       width: 180
       focusable: true

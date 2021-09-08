@@ -51,7 +51,15 @@ function init()
 
 	g_keyboard.bindKeyDown('Ctrl+Alt+B', toggle)
 	poxBotWindow:recursiveGetChildById("offsetCenter"):setChecked(true)
-	connect(g_game, { onGameStart = logIn })
+	connect(g_game, {
+					onGameStart = logIn,
+					onGameEnd = terminate
+					})
+	
+	disconnect(g_game, { 
+						onGameStart = logIn,
+						onGameEnd = terminate
+						})
 end
 
 function table.contains(table, element)
@@ -69,11 +77,6 @@ end
 
 function terminate()
 	poxBotWindow:destroy()
-	poxBotButton:destroy()
-end
-
-function disable()
-	poxBotButton:hide()
 end
 
 function hide()
