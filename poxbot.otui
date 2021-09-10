@@ -157,9 +157,9 @@ MainWindow
       anchors.left: shovel.right
     Button
       id: ladder
-      !text: tr('Ladder')
+      !text: tr('Use')
       width: 50
-      @onClick: modules.game_poxbot.addWaypoint("Ladder")
+      @onClick: modules.game_poxbot.addWaypoint("Use")
       anchors.top: waypoints.bottom
       anchors.left: rope.right
     Button

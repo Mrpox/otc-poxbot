@@ -1,7 +1,3 @@
-local defaultOptions = {
-	enableAudio = false,	
-}
-
 local walkEvent = nil
 local stop = false
 local isAttacking = false
@@ -32,13 +28,12 @@ local lurePathResult = nil
 local lureCurrStep = 1
 local healingCooldown = os.time()
 local manaCooldown = os.time()
+
 function init()
 	poxBotWindow = g_ui.displayUI('poxbot')
-	player = g_game.getLocalPlayer()
 	waypointList = poxBotWindow:recursiveGetChildById('waypoints')
 	targetList = poxBotWindow:recursiveGetChildById('targets')
 	itemList = poxBotWindow:recursiveGetChildById('lootitems')
-	poxBotWindow:hide()  
 	atkButton = poxBotWindow:recursiveGetChildById('autoAttack')
 	healButton = poxBotWindow:recursiveGetChildById('AutoHeal')
 	lootButton = poxBotWindow:recursiveGetChildById('autoLoot')
@@ -48,9 +43,10 @@ function init()
 	manaTrainButton = poxBotWindow:recursiveGetChildById('ManaTrain')
 	hasteButton = poxBotWindow:recursiveGetChildById('AutoHaste')
 	manaShieldButton = poxBotWindow:recursiveGetChildById('AutoManaShield')
-
+	poxBotWindow:hide()
 	g_keyboard.bindKeyDown('Ctrl+Alt+B', toggle)
 	poxBotWindow:recursiveGetChildById("offsetCenter"):setChecked(true)
+	scheduleEvent(setPlayer, 1500)
 	connect(g_game, {
 					onGameStart = logIn,
 					onGameEnd = terminate
@@ -72,10 +68,20 @@ function table.contains(table, element)
 end
 
 function logIn()
+
+end
+
+function setPlayer()
+    if not g_game.isOnline() then
+		scheduleEvent(setPlayer,1500)
+        return
+	end
 	player = g_game.getLocalPlayer()
 end
 
+
 function terminate()
+	g_keyboard.unbindKeyDown('Ctrl+Alt+B', toggle)
 	poxBotWindow:destroy()
 end
 
@@ -90,11 +96,11 @@ function show()
 end
 
 function toggle()
-  if poxBotWindow:isVisible() then
-    hide()
-  else
-    show()
-  end
+	if poxBotWindow:isVisible() then
+		hide()
+	else
+		show()
+	end
 end
 function selectPanel(key)
 	if key == "cavebot" then
@@ -327,12 +333,12 @@ function atkLoop()
 		end
 	if(player:canAttack()) then
 		local pPos = player:getPosition()
-		if pPos then --solves some weird bug, in the first login, the players position is nil in the start for some reason
+		if pPos then
 			local creatures = g_map.getSpectators(pPos, false)
 			for _, creature in ipairs(creatures) do
 				cPos = creature:getPosition()
-				--getDistanceBetween(pPos, cPos) <= 5 and  and player:canReach(creature)
 				if table.contains(targets,creature:getName():lower()) and getDistanceBetween(pPos, cPos) <= 5 then
+					g_game.stop()
 					currTarget = creature:getId()
 					g_game.attack(creature)
 					atkLoopId = scheduleEvent(atkLoop, 200)
@@ -379,7 +385,6 @@ function addLoot()
 end
 
 function walkToTarget()
-	--found this function made by gesior, i edited it abit, maybe there's better ways to walk? 
 	autowalkTargetPosition = waypoints[currentTargetPositionId]
 	lureCurrStep = 1
 	lurePath = nil
@@ -413,13 +418,10 @@ function walkToTarget()
 			end
 			walkEvent = scheduleEvent(walkToTarget, 1500)
 			return
-		elseif autowalkTargetPosition.option == "Ladder" then
+		elseif autowalkTargetPosition.option == "Use" then
 			if (getDistanceBetween(playerPos, autowalkTargetPosition.position) <= 5) then
 				for _,it in pairs(g_map.getTile(autowalkTargetPosition.position):getItems()) do
-					if it:getId() == 1948 then
-						g_game.use(it)
-						break
-					end
+					g_game.use(it)
 				end
 			end
 			currentTargetPositionId = currentTargetPositionId + 1
@@ -446,10 +448,7 @@ function walkToTarget()
 			return 
 		end
 	end
-	-- if g_game.getLocalPlayer():getStepTicksLeft() > 0 then
-	-- 	walkEvent = scheduleEvent(walkToTarget, g_game.getLocalPlayer():getStepTicksLeft())
-    --     return
-	-- end
+
 	if g_game.isAttacking() or isFollowing then
 		walkEvent = scheduleEvent(walkToTarget, 100)
         return
@@ -462,26 +461,31 @@ function walkToTarget()
 		walkEvent = scheduleEvent(walkToTarget, 100)
 		return
 	end
-    -- fast search path on minimap (known tiles)
-    steps, result = g_map.findPath(g_game.getLocalPlayer():getPosition(), autowalkTargetPosition.position, 5000, 0)
-	if result == PathFindResults.Ok then
-        g_game.walk(steps[1], true)
-	elseif result == PathFindResults.Position then
+	if playerPos == autowalkTargetPosition.position then
 		currentTargetPositionId = currentTargetPositionId + 1
 		if (currentTargetPositionId > #waypoints) then
 			currentTargetPositionId = 1
 		end
-    else
-        -- slow search path on minimap, if not found, start 'scanning' map
-        steps, result = g_map.findPath(g_game.getLocalPlayer():getPosition(), autowalkTargetPosition.position, 25000, 1)
-        if result == PathFindResults.Ok then
-            g_game.walk(steps[1], true)
-		else
-			-- can't reach?  so skip this waypoint. improve this somehow
+	end
+	if not player:isWalking() then
+		steps, result = g_map.findPath(g_game.getLocalPlayer():getPosition(), autowalkTargetPosition.position, 5000, 0)
+		if result == PathFindResults.Ok then
+			g_game.autoWalk(steps, true)
+		elseif result == PathFindResults.Position then
 			currentTargetPositionId = currentTargetPositionId + 1
+			if (currentTargetPositionId > #waypoints) then
+				currentTargetPositionId = 1
+			end
+		else
+			steps, result = g_map.findPath(g_game.getLocalPlayer():getPosition(), autowalkTargetPosition.position, 25000, 1)
+			if result == PathFindResults.Ok then
+				g_game.autoWalk(steps, true)
+			else
+				currentTargetPositionId = currentTargetPositionId + 1
+			end
 		end
-    end
-    -- limit steps to 10 per second (100 ms between steps)
+	end
+
     walkEvent = scheduleEvent(walkToTarget, math.max(100, g_game.getLocalPlayer():getStepTicksLeft()))
 end
 
