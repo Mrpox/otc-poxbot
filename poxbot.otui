@@ -169,6 +169,13 @@ MainWindow
       @onClick: modules.game_poxbot.addWaypoint("Lure")
       anchors.top: waypoints.bottom
       anchors.left: ladder.right
+    Button
+      id: 
+      !text: tr('Wait')
+      width: 50
+      @onClick: modules.game_poxbot.addWaypoint("Wait")
+      anchors.top: buttonOk.bottom
+      anchors.left: waypoints.left
 
     BotBox
       id: walking

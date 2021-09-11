@@ -389,6 +389,7 @@ function walkToTarget()
 	lureCurrStep = 1
 	lurePath = nil
 	lurePathResult = nil
+	local playerPos = player:getPosition()
     if not g_game.isOnline() then
 		walkEvent = scheduleEvent(walkToTarget, 500)
         return
@@ -396,11 +397,17 @@ function walkToTarget()
 	if looting then
 		walkEvent = scheduleEvent(walkToTarget, 1500)
 	end
-	local playerPos = player:getPosition()
+	if g_game.isAttacking() or isFollowing then
+		walkEvent = scheduleEvent(walkToTarget, 500)
+        return
+	end
+	
 	if (playerPos and autowalkTargetPosition) then
 		if autowalkTargetPosition.option == "Shovel" then
 			if (getDistanceBetween(playerPos, autowalkTargetPosition.position) <= 5) then
-				g_game.useInventoryItemWith(3457,g_map.getTile(autowalkTargetPosition.position):getItems()[1])
+				for _,it in pairs(g_map.getTile(autowalkTargetPosition.position):getItems()) do
+					g_game.useInventoryItemWith(3457,it)
+				end
 			end
 			currentTargetPositionId = currentTargetPositionId + 1
 			if (currentTargetPositionId > #waypoints) then
@@ -410,7 +417,12 @@ function walkToTarget()
 			return
 		elseif autowalkTargetPosition.option == "Rope" then
 			if (getDistanceBetween(playerPos, autowalkTargetPosition.position) <= 5) then
-				g_game.useInventoryItemWith(3003,g_map.getTile(autowalkTargetPosition.position):getItems()[1])
+				for _,it in pairs(g_map.getTile(autowalkTargetPosition.position):getItems()) do
+					g_game.useInventoryItemWith(3003,it)
+					if player:getPosition().z ~= autowalkTargetPosition.position.z then
+						break
+					end
+				end
 			end
 			currentTargetPositionId = currentTargetPositionId + 1
 			if (currentTargetPositionId > #waypoints) then
@@ -422,6 +434,9 @@ function walkToTarget()
 			if (getDistanceBetween(playerPos, autowalkTargetPosition.position) <= 5) then
 				for _,it in pairs(g_map.getTile(autowalkTargetPosition.position):getItems()) do
 					g_game.use(it)
+					if player:getPosition().z ~= autowalkTargetPosition.position.z then
+						break
+					end
 				end
 			end
 			currentTargetPositionId = currentTargetPositionId + 1
@@ -438,6 +453,9 @@ function walkToTarget()
 			end
 			walkEvent = scheduleEvent(walkToTarget, 100)
 			return
+		elseif autowalkTargetPosition.option == "Wait" then
+			walkEvent = scheduleEvent(walkToTarget, 1500)
+			return
 		end
 		if (getDistanceBetween(playerPos, autowalkTargetPosition.position) >= 150) then
 			currentTargetPositionId = currentTargetPositionId + 1
@@ -449,10 +467,6 @@ function walkToTarget()
 		end
 	end
 
-	if g_game.isAttacking() or isFollowing then
-		walkEvent = scheduleEvent(walkToTarget, 100)
-        return
-	end
 	if not autowalkTargetPosition then
 		currentTargetPositionId = currentTargetPositionId + 1
 		if (currentTargetPositionId > #waypoints) then
@@ -636,62 +650,95 @@ local corpseOpen = false
 local itemsToLoot = {}
 
 function lootLoop()
-	--[[if itemsToLoot[1] then
-		g_game.move(itemsToLoot[1], g_game.getContainers()[0]:getSlotPosition(0), itemsToLoot[1]:getCount())
-		table.remove(itemsToLoot, 1)
-		if not itemsToLoot[1] then
-			g_game.open(lootList[1].container)
-			corpseOpen = false
-			itemsToLoot = {}
-			table.remove(lootList, 1)
+--[[
+	if g_game.isAttacking() then
+		local target = g_game.getAttackingCreature()
+		if not table.contains(lootList,target:getPosition()) then
+			print("added tile")
+			lootList[#lootList + 1] = target:getPosition()
 		end
 		lootLoopId = scheduleEvent(lootLoop, 300)
+		looting = true
 		return
 	end
-
-	if lootList[1] then
-		looting = true
-		
-		if g_game.isAttacking() then
+	if looting then
+		print("trying to loot")
+		if itemsToLoot[1] then
+			g_game.move(itemsToLoot[1], g_game.getContainers()[0]:getSlotPosition(0), itemsToLoot[1]:getCount())
+			table.remove(itemsToLoot, 1)
+			if not itemsToLoot[1] then
+				g_game.open(lootList[1].container)
+				corpseOpen = false
+				itemsToLoot = {}
+				table.remove(lootList, 1)
+			end
 			lootLoopId = scheduleEvent(lootLoop, 300)
 			return
 		end
-		steps, result = g_map.findPath(g_game.getLocalPlayer():getPosition(), lootList[1].pos, 1000, 1)
+		print(#lootList)
+		if lootList[1] then
+			if not player:isWalking() and getDistanceBetween(player:getPosition(), lootList[1]) > 1 then
+				steps, result = g_map.findPath(g_game.getLocalPlayer():getPosition(), lootList[1], 1000, 1)
 
-        if result == PathFindResults.Ok then
-            g_game.walk(steps[1], true)
-		end
-		if result == 1 and not corpseOpen then
-			g_game.open(lootList[1].container)
-			corpseOpen = true
-			lootLoopId = scheduleEvent(lootLoop, 1000)
-			return
-		end
-		if corpseOpen then
-			for slot,it in ipairs(g_game.getContainers()[#g_game.getContainers()]:getItems()) do
-				print(it:getId())
-				if table.contains(loot,tostring(it:getId())) then
-					print("add loot")
-					table.insert(itemsToLoot, it)
+				if result == PathFindResults.Ok then
+					g_game.autoWalk(steps, true)
 				end
 			end
-			if #itemsToLoot >= 1 then
-				lootLoopId = scheduleEvent(lootLoop, 300)
+			
+			if player:isWalking() then
+				lootLoopId = scheduleEvent(lootLoop, 1000)
+			end
+			
+			if getDistanceBetween(player:getPosition(), lootList[1]) <= 1 then
+				if not corpseOpen then
+					for _,it in pairs(g_map.getTile(lootList[1]):getItems()) do
+						g_game.open(it)
+					end
+					--corpseOpen = true
+					lootLoopId = scheduleEvent(lootLoop, 500)
+				elseif corpseOpen then
+					for slot,it in ipairs(g_game.getContainers()[#g_game.getContainers()]:getItems()) do
+						--if table.contains(loot,tostring(it:getId())) then
+							print("add loot")
+							table.insert(itemsToLoot, it)
+						--end
+					end
+					if #itemsToLoot >= 1 then
+						lootLoopId = scheduleEvent(lootLoop, 300)
+						return
+					end
+					g_game.open(lootList[1].container)
+					corpseOpen = false
+					table.remove(lootList, 1)
+				end
+			end
+			if result == 1 and not corpseOpen then
+				g_game.open(lootList[1].container)
+				corpseOpen = true
+				lootLoopId = scheduleEvent(lootLoop, 1000)
 				return
 			end
-			g_game.open(lootList[1].container)
-			corpseOpen = false
-			table.remove(lootList, 1)
+			if corpseOpen then
+				for slot,it in ipairs(g_game.getContainers()[#g_game.getContainers()]:getItems()) do
+					print(it:getId())
+					if table.contains(loot,tostring(it:getId())) then
+						print("add loot")
+						table.insert(itemsToLoot, it)
+					end
+				end
+				if #itemsToLoot >= 1 then
+					lootLoopId = scheduleEvent(lootLoop, 300)
+					return
+				end
+				g_game.open(lootList[1].container)
+				corpseOpen = false
+				table.remove(lootList, 1)
+			end
+		else
+			looting = false
 		end
-	else
-		looting = false
 	end
-
-	if getLootContainersId == nil then
-		getLootContainersId = scheduleEvent(getLootContainers, 50)
-	end
-	
-	lootLoopId = scheduleEvent(lootLoop, 1000)]]
+	lootLoopId = scheduleEvent(lootLoop, 100)]]
 end
 
 local lastTarget = nil
