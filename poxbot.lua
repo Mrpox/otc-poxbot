@@ -531,7 +531,7 @@ function saveWaypoints()
 	saveText = saveText .. "keepDistance = ".. getBoolean("KeepDistance") ..","
 	saveText = saveText .. "lureTarget = ".. getBoolean("LureTarget") .."\n"
 	saveText = saveText .. '}\n'
-	saveText = saveText .. '}\n'
+	saveText = saveText .. '},\n'
 	saveText = saveText .. "looting = {\n"
 	for _,v in pairs(loot) do
 		saveText = saveText .. '"'.. v ..'",'
@@ -543,44 +543,49 @@ function saveWaypoints()
 	saveText = saveText .. "heal3 = '".. poxBotWindow:recursiveGetChildById("Heal3Text"):getText() .."', heal3pc = '".. poxBotWindow:recursiveGetChildById("Heal3Pc"):getText() .."',"
 	saveText = saveText .. '}\n'
 	saveText = saveText .. '}'
+
 	local file = io.open('modules/game_poxbot/savedfiles/'.. poxBotWindow:recursiveGetChildById('WptName'):getText() ..'.lua', 'w')
 	file:write(saveText)
 	file:close()
 end
 
 function loadWaypoints() 
-	local f = io.open('modules/game_poxbot/savefiles/'.. poxBotWindow:recursiveGetChildById('WptName'):getText() ..'.lua', "rb")
-	print(f:read("*all"))
-    local content = f:read("*all")
-	f:close()
-	clearWaypoints()
-	local loadedData = loadstring("return "..content)()
-	waypoints = loadedData.cavebot
-	for _,v in ipairs(waypoints) do
-		local labelt = g_ui.createWidget('Waypoint', waypointList)
-		labelt:setText(v.option .. " (".. v.position.x .. "," .. v.position.y .. "," .. v.position.z .. ")")
+	local f = io.open('modules/game_poxbot/savedfiles/'.. poxBotWindow:recursiveGetChildById('WptName'):getText() ..'.lua', "rb")
+	if f then
+
+		local content = f:read("*all")
+		f:close()
+
+		clearWaypoints()
+		
+		local loadedData = loadstring("return " .. content)()
+		waypoints = loadedData.cavebot
+		for _,v in ipairs(waypoints) do
+			local labelt = g_ui.createWidget('Waypoint', waypointList)
+			labelt:setText(v.option .. " (".. v.position.x .. "," .. v.position.y .. "," .. v.position.z .. ")")
+		end
+		
+		clearTargets()
+		targets = loadedData.targeting.creatures
+		for _,v in ipairs(targets) do
+			local labelt = g_ui.createWidget('Waypoint', targetList)
+			labelt:setText(v.name)
+		end
+		
+		clearItems()
+		loot = loadedData.looting
+		for _,v in ipairs(loot) do
+			local labelt = g_ui.createWidget('Waypoint', itemList)
+			labelt:setText(v.name)
+		end
+		
+		poxBotWindow:recursiveGetChildById("Heal1Text"):setText(loadedData.healing.heal1)
+		poxBotWindow:recursiveGetChildById("Heal1Pc"):setText(loadedData.healing.heal1pc)
+		poxBotWindow:recursiveGetChildById("Heal2Text"):setText(loadedData.healing.heal2)
+		poxBotWindow:recursiveGetChildById("Heal2Pc"):setText(loadedData.healing.heal2pc)
+		poxBotWindow:recursiveGetChildById("Heal3Text"):setText(loadedData.healing.heal3)
+		poxBotWindow:recursiveGetChildById("Heal3Pc"):setText(loadedData.healing.heal3pc)
 	end
-	
-	clearTargets()
-	targets = loadedData.targeting.creatures
-	for _,v in ipairs(targets) do
-		local labelt = g_ui.createWidget('Waypoint', targetList)
-		labelt:setText(v.name)
-	end
-	
-	clearItems()
-	loot = loadedData.looting
-	for _,v in ipairs(loot) do
-		local labelt = g_ui.createWidget('Waypoint', itemList)
-		labelt:setText(v.name)
-	end
-	
-	poxBotWindow:recursiveGetChildById("Heal1Text"):setText(loadedData.healing.heal1)
-	poxBotWindow:recursiveGetChildById("Heal1Pc"):setText(loadedData.healing.heal1pc)
-	poxBotWindow:recursiveGetChildById("Heal2Text"):setText(loadedData.healing.heal2)
-	poxBotWindow:recursiveGetChildById("Heal2Pc"):setText(loadedData.healing.heal2pc)
-	poxBotWindow:recursiveGetChildById("Heal3Text"):setText(loadedData.healing.heal3)
-	poxBotWindow:recursiveGetChildById("Heal3Pc"):setText(loadedData.healing.heal3pc)
 end
 
 function clearWaypoints()
