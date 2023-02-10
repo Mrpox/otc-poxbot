@@ -4,7 +4,23 @@ Waypoint < Label
   focusable: true
   id: wpt
 
-BotBox < OptionCheckBox
+WaitWaypoint < Label
+  background-color: alpha
+  text-offset: 2 0
+  focusable: true
+  id: wpt
+
+ActionWaypoint < UICheckBox
+  @onCheckChange: modules.game_poxbot.editAction(self)
+  background-color: alpha
+  text-offset: 2 0
+  focusable: true
+  id: wpt
+
+BotBox < CheckBox
+  anchors.left: parent.left
+  anchors.top: prev.bottom
+  width: 150
   @onCheckChange: modules.game_poxbot.toggleLoop(self:getId())
 
 NormalBotBox < CheckBox
@@ -17,6 +33,7 @@ MainWindow
   !text: tr('PoxBot')
   size: 528 440
   @onEscape: self:hide()
+  focusable: true
 
   Label
     height: 1
@@ -84,7 +101,7 @@ MainWindow
       width: 246
       anchors.top: parent.top
       anchors.left: parent.left
-      focusable: false
+      focusable: true
       vertical-scrollbar: reasonListScrollBar
 
     VerticalScrollBar
@@ -134,8 +151,31 @@ MainWindow
         !tooltip: tr('Sets waypoint to the south of player position')
         margin-left: 32
 
+    FlatPanel
+      id: actionEditor
+      anchors.left: offets.left
+      anchors.right: parent.right
+      anchors.top: offets.bottom
+      anchors.bottom: parent.bottom
+      visible: false
+
+      MultilineTextEdit
+        id: actionText
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.bottom: actionSave.top
+
+      Button
+        id: actionSave
+        !text: tr('Save')
+        width: 100
+        @onClick: modules.game_poxbot.saveAction()
+        anchors.bottom: parent.bottom
+        anchors.right: parent.right
+
     Button
-      id: buttonOk
+      id: walkButton
       !text: tr('Walk')
       width: 50
       @onClick: modules.game_poxbot.addWaypoint("Walk")
@@ -147,7 +187,7 @@ MainWindow
       width: 50
       @onClick: modules.game_poxbot.addWaypoint("Shovel")
       anchors.top: waypoints.bottom
-      anchors.left: buttonOk.right
+      anchors.left: walkButton.right
     Button
       id: rope
       !text: tr('Rope')
@@ -163,19 +203,12 @@ MainWindow
       anchors.top: waypoints.bottom
       anchors.left: rope.right
     Button
-      id: lure
-      !text: tr('Lure')
+      id: action
+      !text: tr('Action')
       width: 50
-      @onClick: modules.game_poxbot.addWaypoint("Lure")
+      @onClick: modules.game_poxbot.addWaypoint("Action")
       anchors.top: waypoints.bottom
       anchors.left: ladder.right
-    Button
-      id: 
-      !text: tr('Wait')
-      width: 50
-      @onClick: modules.game_poxbot.addWaypoint("Wait")
-      anchors.top: buttonOk.bottom
-      anchors.left: waypoints.left
 
     BotBox
       id: walking
@@ -191,6 +224,32 @@ MainWindow
       anchors.left: parent.left
       margin-top: 5
 
+    Label
+      !text: tr('Default shovel ')
+      anchors.top: prev.bottom
+      anchors.left: parent.left
+      margin-top: 20
+      margin-left: 5
+    ComboBox
+      id: selectedShovel
+      width: 120
+      anchors.left: parent.left
+      anchors.top: prev.bottom
+      margin-left: 5
+      mouse-scroll: false
+    Label
+      !text: tr('Default rope ')
+      anchors.top: prev.bottom
+      anchors.left: parent.left
+      margin-top: 20
+      margin-left: 5
+    ComboBox
+      id: selectedRope
+      width: 120
+      anchors.left: parent.left
+      anchors.top: prev.bottom
+      margin-left: 5
+      mouse-scroll: false
   FlatPanel
     id: targeting
     width: 200

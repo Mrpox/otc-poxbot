@@ -3,8 +3,8 @@ local stop = false
 local isAttacking = false
 local isFollowing = false
 local looting = false
-local currentTargetPositionId = 1
-local waypoints = {}
+ currentTargetPositionId = 1
+ waypoints = {}
 local targets = {}
 local loot = {}
 local autowalkTargetPosition = waypoints[currentTargetPositionId]
@@ -28,6 +28,22 @@ local lurePathResult = nil
 local lureCurrStep = 1
 local healingCooldown = os.time()
 local manaCooldown = os.time()
+local editingWp = nil
+
+local scriptFunctions = [[	
+	function itemcount(itemId)
+		local count = 0
+		if g_game.findItemInContainers(itemId,-1) ~= nil then
+			count = g_game.findItemInContainers(itemId,-1):getCount()
+		end
+		
+		return count
+	end
+	
+	function gotolabel()
+		print(currentTargetPositionId)
+	end
+]]
 
 function init()
 	poxBotWindow = g_ui.displayUI('poxbot')
@@ -46,7 +62,7 @@ function init()
 	poxBotWindow:hide()
 	g_keyboard.bindKeyDown('Ctrl+Alt+B', toggle)
 	poxBotWindow:recursiveGetChildById("offsetCenter"):setChecked(true)
-	scheduleEvent(setPlayer, 1500)
+	scheduleEvent(setPlayer, 1500) --Fixes stuff.
 	connect(g_game, {
 					onGameStart = logIn,
 					onGameEnd = terminate
@@ -56,6 +72,17 @@ function init()
 						onGameStart = logIn,
 						onGameEnd = terminate
 						})
+						
+						
+	shovelCombobox = poxBotWindow:recursiveGetChildById('selectedShovel')
+
+    shovelCombobox:addOption('Shovel', '3457')
+    shovelCombobox:addOption('Light Shovel', '5710')
+
+	ropeCombobox = poxBotWindow:recursiveGetChildById('selectedRope')
+
+    ropeCombobox:addOption('Rope', '3003')
+    ropeCombobox:addOption('Elvenhair rope', '646')
 end
 
 function table.contains(table, element)
@@ -104,33 +131,45 @@ function toggle()
 end
 function selectPanel(key)
 	if key == "cavebot" then
+		poxBotWindow:recursiveGetChildById('actionEditor'):setVisible(false)
 		poxBotWindow:recursiveGetChildById('cavebot'):setVisible(true)
 		poxBotWindow:recursiveGetChildById('targeting'):setVisible(false)
 		poxBotWindow:recursiveGetChildById('looting'):setVisible(false)
 		poxBotWindow:recursiveGetChildById('healing'):setVisible(false)
 		poxBotWindow:recursiveGetChildById('tools'):setVisible(false)
 	elseif key == "targeting" then
+		poxBotWindow:recursiveGetChildById('actionEditor'):setVisible(false)
 		poxBotWindow:recursiveGetChildById('cavebot'):setVisible(false)
 		poxBotWindow:recursiveGetChildById('targeting'):setVisible(true)
 		poxBotWindow:recursiveGetChildById('looting'):setVisible(false)
 		poxBotWindow:recursiveGetChildById('healing'):setVisible(false)
 		poxBotWindow:recursiveGetChildById('tools'):setVisible(false)
 	elseif key == "healing" then
+		poxBotWindow:recursiveGetChildById('actionEditor'):setVisible(false)
 		poxBotWindow:recursiveGetChildById('cavebot'):setVisible(false)
 		poxBotWindow:recursiveGetChildById('targeting'):setVisible(false)
 		poxBotWindow:recursiveGetChildById('looting'):setVisible(false)
 		poxBotWindow:recursiveGetChildById('healing'):setVisible(true)
 		poxBotWindow:recursiveGetChildById('tools'):setVisible(false)
 	elseif key == "tools" then
+		poxBotWindow:recursiveGetChildById('actionEditor'):setVisible(false)
 		poxBotWindow:recursiveGetChildById('cavebot'):setVisible(false)
 		poxBotWindow:recursiveGetChildById('targeting'):setVisible(false)
 		poxBotWindow:recursiveGetChildById('looting'):setVisible(false)
 		poxBotWindow:recursiveGetChildById('healing'):setVisible(false)
 		poxBotWindow:recursiveGetChildById('tools'):setVisible(true)
 	elseif key == "looting" then
+		poxBotWindow:recursiveGetChildById('actionEditor'):setVisible(false)
 		poxBotWindow:recursiveGetChildById('cavebot'):setVisible(false)
 		poxBotWindow:recursiveGetChildById('targeting'):setVisible(false)
 		poxBotWindow:recursiveGetChildById('looting'):setVisible(true)
+		poxBotWindow:recursiveGetChildById('healing'):setVisible(false)
+		poxBotWindow:recursiveGetChildById('tools'):setVisible(false)
+	elseif key == "actionEditor" then
+		poxBotWindow:recursiveGetChildById('actionEditor'):setVisible(true)
+		poxBotWindow:recursiveGetChildById('cavebot'):setVisible(false)
+		poxBotWindow:recursiveGetChildById('targeting'):setVisible(false)
+		poxBotWindow:recursiveGetChildById('looting'):setVisible(false)
 		poxBotWindow:recursiveGetChildById('healing'):setVisible(false)
 		poxBotWindow:recursiveGetChildById('tools'):setVisible(false)
 	end
@@ -351,7 +390,14 @@ function atkLoop()
 end
 
 function addWaypoint(waypointType)
-	local label = g_ui.createWidget('Waypoint', waypointList)
+	local label = nil
+	if waypointType:lower() == "wait" then
+		label = g_ui.createWidget('WaitWaypoint', waypointList)
+	elseif waypointType:lower() == "action" then
+		label = g_ui.createWidget('ActionWaypoint', waypointList)
+	else
+		label = g_ui.createWidget('Waypoint', waypointList)
+	end
 	local pos = player:getPosition()
 	if offset == 1 then
 		pos.y = pos.y - 1
@@ -362,12 +408,46 @@ function addWaypoint(waypointType)
 	elseif offset == 5 then
 		pos.x = pos.x + 1
 	end
-	label:setText(waypointType .. " (".. pos.x .. "," .. pos.y .. "," .. pos.z .. ")")
+	label:setText(waypointType .. "( #".. #waypoints + 1 .." ) - (".. pos.x .. "," .. pos.y .. "," .. pos.z .. ")")
 	local waypointTable = {
+		text = waypointType .. "( #".. #waypoints + 1 .." ) - (".. pos.x .. "," .. pos.y .. "," .. pos.z .. ")",
 		option = waypointType,
-		position = pos
+		position = pos,
+		wait = 1500,
+		script = ""
 	}
+	label.info = waypointTable
 	table.insert(waypoints, waypointTable)
+end
+
+function editAction(self)
+	if not self:isChecked() then
+		return
+	end
+	for _,wp in pairs(waypoints) do
+		if self:getText() == wp.text then
+			editingWp = wp
+			break
+		end
+	end
+
+	poxBotWindow:recursiveGetChildById('actionEditor'):setVisible(true)
+	poxBotWindow:recursiveGetChildById('actionText'):setText(editingWp.script)
+	
+	self:setChecked(false)
+end
+
+function saveAction()
+	editingWp.script = poxBotWindow:recursiveGetChildById('actionText'):getText()
+	editingWp = nil
+	poxBotWindow:recursiveGetChildById('actionEditor'):setVisible(false)
+end
+
+function runAction(actionScript)
+	local action = assert(loadstring(scriptFunctions .. " " .. actionScript))
+	action()
+	
+	
 end
 
 function addTarget()
@@ -394,14 +474,12 @@ function walkToTarget()
 		walkEvent = scheduleEvent(walkToTarget, 500)
         return
 	end
-	if looting then
-		walkEvent = scheduleEvent(walkToTarget, 1500)
-	end
+
 	if g_game.isAttacking() or isFollowing then
 		walkEvent = scheduleEvent(walkToTarget, 500)
         return
 	end
-	
+
 	if (playerPos and autowalkTargetPosition) then
 		if autowalkTargetPosition.option == "Shovel" then
 			if (getDistanceBetween(playerPos, autowalkTargetPosition.position) <= 5) then
@@ -445,13 +523,13 @@ function walkToTarget()
 			end
 			walkEvent = scheduleEvent(walkToTarget, 1500)
 			return
-		elseif autowalkTargetPosition.option == "Lure" then
-			lurePos = autowalkTargetPosition.position
+		elseif autowalkTargetPosition.option == "Action" then
+			runAction(autowalkTargetPosition.script)
 			currentTargetPositionId = currentTargetPositionId + 1
 			if (currentTargetPositionId > #waypoints) then
 				currentTargetPositionId = 1
 			end
-			walkEvent = scheduleEvent(walkToTarget, 100)
+			walkEvent = scheduleEvent(walkToTarget, 250)
 			return
 		elseif autowalkTargetPosition.option == "Wait" then
 			walkEvent = scheduleEvent(walkToTarget, 1500)
@@ -481,26 +559,29 @@ function walkToTarget()
 			currentTargetPositionId = 1
 		end
 	end
+
 	if not player:isWalking() then
-		steps, result = g_map.findPath(g_game.getLocalPlayer():getPosition(), autowalkTargetPosition.position, 5000, 0)
+		local currPos = g_game.getLocalPlayer():getPosition()
+		steps, result = g_map.findPath(currPos, autowalkTargetPosition.position, 5000, 0)
 		if result == PathFindResults.Ok then
-			g_game.autoWalk(steps, true)
+			g_game.autoWalk(steps, currPos)
 		elseif result == PathFindResults.Position then
 			currentTargetPositionId = currentTargetPositionId + 1
 			if (currentTargetPositionId > #waypoints) then
 				currentTargetPositionId = 1
 			end
 		else
-			steps, result = g_map.findPath(g_game.getLocalPlayer():getPosition(), autowalkTargetPosition.position, 25000, 1)
+			steps, result = g_map.findPath(currPos, autowalkTargetPosition.position, 25000, 1)
 			if result == PathFindResults.Ok then
-				g_game.autoWalk(steps, true)
+				g_game.autoWalk(steps, currPos)
 			else
 				currentTargetPositionId = currentTargetPositionId + 1
 			end
 		end
 	end
-
+	
     walkEvent = scheduleEvent(walkToTarget, math.max(100, g_game.getLocalPlayer():getStepTicksLeft()))
+	
 end
 
 function getBoolean(key)
@@ -514,7 +595,7 @@ function saveWaypoints()
 	local saveText = '{\n'
 	saveText = saveText .. "cavebot = {\n"
 	for _,v in pairs(waypoints) do
-		saveText = saveText .. '{option = "'.. v.option ..'", position = {x = '.. v.position.x ..', y = ' .. v.position.y .. ', z = ' .. v.position.z .. '}},\n'
+		saveText = saveText .. '{text = "'.. v.text ..'", option = "'.. v.option ..'", position = {x = '.. v.position.x ..', y = ' .. v.position.y .. ', z = ' .. v.position.z .. '}, script = "'.. v.script ..'"},\n'
 	end
 	saveText = saveText .. '},\n'
 	saveText = saveText .. "targeting = {\n"
@@ -561,8 +642,17 @@ function loadWaypoints()
 		local loadedData = loadstring("return " .. content)()
 		waypoints = loadedData.cavebot
 		for _,v in ipairs(waypoints) do
-			local labelt = g_ui.createWidget('Waypoint', waypointList)
-			labelt:setText(v.option .. " (".. v.position.x .. "," .. v.position.y .. "," .. v.position.z .. ")")
+			local label = nil
+			if v.option:lower() == "wait" then
+				label = g_ui.createWidget('WaitWaypoint', waypointList)
+			elseif v.option:lower() == "action" then
+				label = g_ui.createWidget('ActionWaypoint', waypointList)
+			else
+				label = g_ui.createWidget('Waypoint', waypointList)
+			end
+
+			label:setText(v.text)
+			label.info = v
 		end
 		
 		clearTargets()
